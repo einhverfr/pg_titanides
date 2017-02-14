@@ -59,9 +59,23 @@ DECLARE retval bigint[];
 BEGIN
 EXECUTE $E$SELECT array_agg(id) into retval
   FROM pt_jobs_$E$ || in_qid::text || $E$
- WHERE id = ANY($1) $E$ USING jobids1;
+ WHERE id = ANY($1) $E$ USING jobids;
 
 RETURN retval;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION pgt_complete_job(in_jobid bigint, in_qid int)
+RETURNS BOOL LANGUAGE PLPGSQL AS
+$$
+BEGIN
+EXECUTE $E$
+DELETE
+  FROM pt_jobs_$E$ || in_qid::text || $E$
+ WHERE id = $1 $E$ USING in_jobid;
+
+RETURN FOUND
+
 END;
 $$;
 
