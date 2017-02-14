@@ -22,10 +22,41 @@ RETURNS SETOF pt_jobtemplate
 LANGUAGE PLPGSQL AS
 $$
 DECLARE outrow pt_jobtemplate;
+ locktest bool;
+ rows_returned int;
+ startpoint int;
+ gotpriority bool;
 BEGIN
-	-- try to get advisory lock for priority scan
-	-- declare cursor
-	-- loop through cursor, trying job advisory locks
+    SELECT pg_try_advisory_lock('pt_queues'::regclass::oid::int, in_qid) 
+      INTO gotpriority;
+
+    IF locktest THEN -- priority scan
+        jobcurs CURSOR FOR EXECUTE $E$
+        SELECT * FROM pt_jobs_$E$ || in_qid::text 
+	|| $E$ ORDER BY priority asc $E$;
+    ELSE -- grab random point from histogram and go forward
+        SELECT histogram[...] INTO startpoint
+	  FROM pg_stats
+	 WHERE ....;
+
+	jobcurs CURSOR FOR EXECUTE $E$
+        SELECT * FROM pt_jobs_$E$ || in_qid::text 
+	|| $E$ WHERE ID > $1 ORDER BY id asc $E$ using startpoint;
+    END IF;
+
+    LOOP
+        FETCH FROM jobcurs INTO outrow;
+        IF outrow IS NULL THEN
+           RETURN;
+        END IF;
+        IF .... THEN
+           rows_returned := rows_returned + 1;
+           RETURN NEXT outrow;
+        END IF;
+        IF rows_returned >= in_batch_size THEN
+           RETURN;
+        END IF;
+    END LOOP;
 END;
 $$;
 
