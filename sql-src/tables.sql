@@ -1,11 +1,11 @@
-CREATE TABLE queues (
+CREATE TABLE pt_queues (
     id serial not null unique,
     queue_name primary key,
     language text not null,
     classname text not null
 );
 
-CREATE TABLE jobtemplate (
+CREATE TABLE pt_jobtemplate (
     id bigserial primary key, -- yes people run out of ints
     queueid int not null references queues(id),
     coalesce_code text not null default '',
