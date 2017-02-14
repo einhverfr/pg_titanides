@@ -10,12 +10,14 @@ BEGIN
 
     EXECUTE $E$
         CREATE TABLE pt_jobs_$E$ || qid::text || $E$
-	   (LIKE pt_jobtemplate INCLUDING ALL) INHERITS (pt_jobtemplate) $E$;
+	   (LIKE pt_jobtemplate INCLUDING ALL,
+	    CHECK queue_id = $E$ || qid || $E$) INHERITS (pt_jobtemplate) $E$;
     SELECT * FROM pt_queues INTO retval WHERE id = qid;
+
     RETURN retval;
 $$;
 
-CREATE OR REPLACE FUNCTION pgt_get_jobes(in_qid, in_batch_size)
+CREATE OR REPLACE FUNCTION pgt_get_jobs(in_qid, in_batch_size)
 RETURNS SETOF pt_jobtemplate
 LANGUAGE PLPGSQL AS
 $$
@@ -24,6 +26,29 @@ BEGIN
 	-- try to get advisory lock for priority scan
 	-- declare cursor
 	-- loop through cursor, trying job advisory locks
+END;
+$$;
+
+CREATE OR REPLCE FUNCTION pgt_fail_job(in_jobid bigint, in_message text, in_qid int)
+RETURNS TIMESTAMP LANGAUGE PLPGSQL AS
+$$
+DECLARE sec_delay interval;
+BEGIN
+    EXECUTE $e$
+    INSERT INTO pt_error (job_id, queue_id, args, message)
+    SELECT id, queue_id, args, $2
+      FROM pt_jobs_$e$ || in_qid::text || $E$
+     WHERE id = $1 $E$ USING in_jobid, in_message;
+
+    SELECT count(*) ^ 2 INTO sec_delay
+      FROM pt_error WHERE queue_id = in_qid AND jobid = in_jobid;
+
+    EXECUTE $E$
+    UPDATE pt_jobs_$E$ || in_qid::text || $E$
+       SET run_after = now() + ?
+     WHERE id = ? $E$ USING ((sec_delay::text || ' seconds')::interval, in_jobid);
+
+    RETURN now() + (sec_delay::text || ' seconds')::interval;
 END;
 $$;
 
