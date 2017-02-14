@@ -35,9 +35,9 @@ BEGIN
         SELECT * FROM pt_jobs_$E$ || in_qid::text 
 	|| $E$ ORDER BY priority asc $E$;
     ELSE -- grab random point from histogram and go forward
-        SELECT histogram[...] INTO startpoint
+        SELECT (histogram_bounds::int[])[(array_upper(histogram_bounds, 1) * random())::int ] INTO startpoint
 	  FROM pg_stats
-	 WHERE ....;
+	 WHERE tablename = 'pt_jobs_' || in_qid AND attname = 'id';
 
 	jobcurs CURSOR FOR EXECUTE $E$
         SELECT * FROM pt_jobs_$E$ || in_qid::text 
@@ -49,7 +49,7 @@ BEGIN
         IF outrow IS NULL THEN
            RETURN;
         END IF;
-        IF .... THEN
+        IF pg_try_advisory_lock(('pt_jobs_' || in_qid)::regclass::oid::int, (outrow.id % 100000000)) THEN
            rows_returned := rows_returned + 1;
            RETURN NEXT outrow;
         END IF;
