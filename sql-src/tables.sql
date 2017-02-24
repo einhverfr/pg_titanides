@@ -2,6 +2,7 @@ CREATE TABLE pt_queues (
     id serial not null unique,
     queue_name primary key,
     language text not null,
+    lock_against regclass,
     classname text not null
 ); -- usually small, no indexes needed
 

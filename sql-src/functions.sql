@@ -26,7 +26,9 @@ DECLARE outrow pt_jobtemplate;
  rows_returned int;
  startpoint int;
  gotpriority bool;
+ t_q pt_queues;
 BEGIN
+    SELECT * INTO t_q FROM pg_queues WHERE id = in_qid;
     SELECT pg_try_advisory_lock('pt_queues'::regclass::oid::int, in_qid) 
       INTO gotpriority;
 
@@ -50,8 +52,10 @@ BEGIN
            RETURN;
         END IF;
         IF pg_try_advisory_lock(('pt_jobs_' || in_qid)::regclass::oid::int, (outrow.id % 100000000)) THEN
-           rows_returned := rows_returned + 1;
-           RETURN NEXT outrow;
+	   if pg_try_advisory_lock(t_q.lock_against::oid::int, outrow.lock_id)
+	   IS NOT FALSE THEN
+               rows_returned := rows_returned + 1;
+               RETURN NEXT outrow;
         END IF;
         IF rows_returned >= in_batch_size THEN
            RETURN;
